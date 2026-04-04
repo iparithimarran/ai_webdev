@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digit Recognition</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #2a2a2a;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #666;
+    --digit-size: 280px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 40px 24px 24px;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 860px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0;
+  }
+
+  /* ── Navbar (sits above the wrapper grid) ── */
+  .navbar {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 860px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    padding: 0 28px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Logo */
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    cursor: default;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-icon span {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    color: #000;
+    line-height: 1;
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .logo-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Dropdown nav */
+  .nav-menu {
+    position: relative;
+  }
+
+  .nav-trigger {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+  }
+
+  .nav-trigger:hover { border-color: var(--muted); color: var(--text); }
+  .nav-trigger.open  { border-color: var(--accent); color: var(--accent); }
+
+  .nav-trigger .chevron {
+    width: 8px; height: 8px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translateY(-2px);
+    transition: transform 0.2s;
+  }
+  .nav-trigger.open .chevron { transform: rotate(225deg) translateY(-2px); }
+
+  .nav-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    min-width: 140px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+  }
+
+  .nav-dropdown.open {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+  }
+
+  .nav-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    transition: all 0.12s;
+  }
+
+  .nav-item:last-child { border-bottom: none; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+
+  .nav-item .nav-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background 0.12s;
+  }
+  .nav-item:hover .nav-dot { background: var(--accent); }
+
+  /* ── About modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 40px 24px 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 540px;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: scale(0.96) translateY(10px);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .modal-overlay.open .modal { transform: scale(1) translateY(0); }
+
+  .modal-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .modal-close {
+    width: 28px; height: 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .modal-close:hover { border-color: var(--muted); color: var(--text); }
+
+  .modal-body { padding: 28px; display: flex; flex-direction: column; gap: 28px; }
+
+  .about-section {}
+
+  .about-section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .about-section p {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .tech-card {
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--surface2);
+  }
+
+  .tech-card-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+
+  .tech-card-role {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .stat-box {
+    flex: 1;
+    border: 1px solid var(--border);
+    padding: 14px;
+    text-align: center;
+    background: var(--surface2);
+  }
+
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Header spans full width */
+  header {
+    grid-column: 1 / -1;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+  }
+
+  header h1 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  header .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 2px 8px;
+    letter-spacing: 0.1em;
+  }
+
+  /* Left panel - canvas area */
+  .panel-draw {
+    border: 1px solid var(--border);
+    border-right: none;
+    background: var(--surface);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .canvas-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    background: #000;
+    border: 1px solid var(--border);
+    cursor: crosshair;
+    overflow: hidden;
+  }
+
+  .canvas-container::after {
+    content: 'draw here';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: #333;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .canvas-container.has-drawing::after { opacity: 0; }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
+
+  .canvas-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex: 1;
+  }
+
+  .btn:hover { border-color: var(--muted); background: var(--surface2); }
+
+  .btn-predict {
+    border-color: var(--accent);
+    color: var(--accent);
+    flex: 2;
+  }
+
+  .btn-predict:hover {
+    background: var(--accent);
+    color: #000;
+  }
+
+  .btn-predict:active { transform: scale(0.98); }
+
+  .btn-predict.loading {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* Right panel - result */
+  .panel-result {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .result-display {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    border: 1px solid var(--border);
+    background: #000;
+    min-height: 180px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result-digit {
+    font-family: 'Syne', sans-serif;
+    font-size: 120px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  .result-digit.show {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .result-idle {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: #333;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Confidence bars */
+  .confidence-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .confidence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .conf-digit {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    width: 12px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .conf-bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .conf-bar-fill {
+    height: 100%;
+    background: var(--border);
+    width: 0%;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+  }
+
+  .conf-bar-fill.top { background: var(--accent); }
+  .conf-bar-fill.second { background: var(--accent2); }
+
+  .conf-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    width: 34px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Footer */
+  footer {
+    grid-column: 1 / -1;
+    border: 1px solid var(--border);
+    border-top: none;
+    background: var(--surface);
+    padding: 14px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  footer span {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 6px;
+    transition: background 0.3s;
+  }
+
+  .status-dot.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.error { background: #ff4444; }
+
+  /* Brush size control */
+  .brush-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brush-row input[type=range] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 2px;
+    cursor: pointer;
+  }
+
+  .brush-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    min-width: 20px;
+  }
+
+  /* Mobile */
+  @media (max-width: 560px) {
+    .wrapper { grid-template-columns: 1fr; }
+    .panel-draw { border-right: 1px solid var(--border); border-bottom: none; }
+    footer { flex-direction: column; gap: 6px; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── About Modal ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">About this project</span>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="about-section">
+        <div class="about-section-label">What is this?</div>
+        <p>A handwritten digit recognizer powered by a Convolutional Neural Network trained on the MNIST dataset. Draw any digit from 0 to 9 — however messy — and the model predicts what it is in real time.</p>
+      </div>
+
+      <div class="about-section">
+        <div class="about-section-label">Model stats</div>
+        <div class="stat-row">
+          <div class="stat-box"><div class="stat-num">~99%</div><div class="stat-label">Test accuracy</div></div>
+          <div class="stat-box"><div class="stat-num">60K</div><div class="stat-label">Training images</div></div>
+          <div class="stat-box"><div class="stat-num">10</div><div class="stat-label">Epochs trained</div></div>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <div class="about-section-label">Tech stack</div>
+        <div class="tech-grid">
+          <div class="tech-card">
+            <span class="tech-card-name">TensorFlow / Keras</span>
+            <span class="tech-card-role">Model training · CNN</span>
+          </div>
+          <div class="tech-card">
+            <span class="tech-card-name">MNIST Dataset</span>
+            <span class="tech-card-role">70K labeled images</span>
+          </div>
+          <div class="tech-card">
+            <span class="tech-card-name">Flask + Python</span>
+            <span class="tech-card-role">Backend API server</span>
+          </div>
+          <div class="tech-card">
+            <span class="tech-card-name">HTML · CSS · JS</span>
+            <span class="tech-card-role">Frontend · Canvas</span>
+          </div>
+          <div class="tech-card">
+            <span class="tech-card-name">Flask-CORS</span>
+            <span class="tech-card-role">Cross-origin requests</span>
+          </div>
+          <div class="tech-card">
+            <span class="tech-card-name">Pillow · NumPy</span>
+            <span class="tech-card-role">Image preprocessing</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="about-section">
+        <div class="about-section-label">How it works</div>
+        <p>Your drawing is exported as a base64 PNG, sent to the Flask backend via <code style="font-family:'Space Mono',monospace;font-size:12px;color:var(--accent)">POST /predict</code>, resized to 28×28 pixels, passed through the CNN, and the 10-class softmax output is returned as confidence scores.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Navbar ── -->
+<nav class="navbar">
+  <div class="logo">
+    <div class="logo-icon"><span>D</span></div>
+    <div class="logo-text">
+      <span class="logo-name">DigitAI</span>
+      <span class="logo-sub">MNIST · CNN</span>
+    </div>
+  </div>
+
+  <div class="nav-menu">
+    <button class="nav-trigger" id="navTrigger">
+      Menu <span class="chevron"></span>
+    </button>
+    <div class="nav-dropdown" id="navDropdown">
+      <div class="nav-item" id="navHome"><span class="nav-dot"></span>Home</div>
+      <div class="nav-item" id="navAbout"><span class="nav-dot"></span>About</div>
+    </div>
+  </div>
+</nav>
+
+<div class="wrapper">
+  <header>
+    <h1>Digit Recognizer</h1>
+    <span class="tag">MNIST · CNN</span>
+  </header>
+
+  <!-- LEFT: Draw panel -->
+  <div class="panel-draw">
+    <span class="panel-label">01 — Draw a digit (0–9)</span>
+
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="drawCanvas"></canvas>
+    </div>
+
+    <div class="brush-row">
+      <span class="panel-label" style="white-space:nowrap">Brush</span>
+      <input type="range" id="brushSize" min="10" max="40" value="22">
+      <span class="brush-val" id="brushVal">22</span>
+    </div>
+
+    <div class="canvas-actions">
+      <button class="btn" id="clearBtn">Clear</button>
+      <button class="btn btn-predict" id="predictBtn">Predict →</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Result panel -->
+  <div class="panel-result">
+    <span class="panel-label">02 — Prediction</span>
+
+    <div class="result-display" id="resultDisplay">
+      <span class="result-idle" id="idleMsg">awaiting input</span>
+      <div class="result-digit" id="resultDigit"></div>
+    </div>
+
+    <div class="confidence-section" id="confSection">
+      <span class="panel-label">Confidence distribution</span>
+      <div id="confBars"></div>
+    </div>
+  </div>
+
+  <footer>
+    <span><span class="status-dot" id="statusDot"></span><span id="statusText">ready</span></span>
+    <span id="backendNote">backend: localhost:5000</span>
+  </footer>
+</div>
+
+<script>
+// ── Canvas setup ───────────────────────────────────────────────
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvasContainer');
+
+function resizeCanvas() {
+  const size = container.offsetWidth;
+  canvas.width = size;
+  canvas.height = size;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#fff';
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ── Drawing state ──────────────────────────────────────────────
+let isDrawing = false;
+let hasDrawing = false;
+let brushSize = 22;
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  if (e.touches) {
+    return {
+      x: (e.touches[0].clientX - rect.left) * scaleX,
+      y: (e.touches[0].clientY - rect.top)  * scaleY
+    };
+  }
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top)  * scaleY
+  };
+}
+
+canvas.addEventListener('mousedown', e => { isDrawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+canvas.addEventListener('mousemove', e => {
+  if (!isDrawing) return;
+  const p = getPos(e);
+  ctx.lineWidth = brushSize;
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  if (!hasDrawing) { hasDrawing = true; container.classList.add('has-drawing'); }
+});
+canvas.addEventListener('mouseup',   () => isDrawing = false);
+canvas.addEventListener('mouseleave', () => isDrawing = false);
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); isDrawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); }, { passive: false });
+canvas.addEventListener('touchmove',  e => {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const p = getPos(e);
+  ctx.lineWidth = brushSize;
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  if (!hasDrawing) { hasDrawing = true; container.classList.add('has-drawing'); }
+}, { passive: false });
+canvas.addEventListener('touchend', () => isDrawing = false);
+
+// ── Brush size ─────────────────────────────────────────────────
+const brushInput = document.getElementById('brushSize');
+const brushVal   = document.getElementById('brushVal');
+brushInput.addEventListener('input', () => {
+  brushSize = parseInt(brushInput.value);
+  brushVal.textContent = brushSize;
+});
+
+// ── Clear ──────────────────────────────────────────────────────
+document.getElementById('clearBtn').addEventListener('click', () => {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  hasDrawing = false;
+  container.classList.remove('has-drawing');
+  resetResult();
+  setStatus('ready', false, false);
+});
+
+// ── Result UI helpers ──────────────────────────────────────────
+const resultDigit  = document.getElementById('resultDigit');
+const idleMsg      = document.getElementById('idleMsg');
+const confBars     = document.getElementById('confBars');
+const statusDot    = document.getElementById('statusDot');
+const statusText   = document.getElementById('statusText');
+
+function resetResult() {
+  resultDigit.classList.remove('show');
+  resultDigit.textContent = '';
+  idleMsg.style.display = 'block';
+  // Reset all bars
+  document.querySelectorAll('.conf-bar-fill').forEach(b => {
+    b.style.width = '0%';
+    b.className = 'conf-bar-fill';
+  });
+  document.querySelectorAll('.conf-pct').forEach(p => p.textContent = '');
+}
+
+function setStatus(text, active, error) {
+  statusText.textContent = text;
+  statusDot.className = 'status-dot' + (active ? ' active' : '') + (error ? ' error' : '');
+}
+
+// Build confidence bars once
+function buildBars() {
+  confBars.innerHTML = '';
+  for (let i = 0; i <= 9; i++) {
+    const row = document.createElement('div');
+    row.className = 'confidence-row';
+    row.innerHTML = `
+      <span class="conf-digit">${i}</span>
+      <div class="conf-bar-track"><div class="conf-bar-fill" id="bar${i}"></div></div>
+      <span class="conf-pct" id="pct${i}"></span>`;
+    confBars.appendChild(row);
+  }
+}
+buildBars();
+
+function showResult(digit, confidences) {
+  idleMsg.style.display = 'none';
+  resultDigit.textContent = digit;
+  resultDigit.classList.add('show');
+
+  // Sort to find top-2
+  const sorted = confidences
+    .map((v, i) => ({ i, v }))
+    .sort((a, b) => b.v - a.v);
+
+  const max = sorted[0].i;
+  const second = sorted[1].i;
+
+  confidences.forEach((v, i) => {
+    const bar = document.getElementById(`bar${i}`);
+    const pct = document.getElementById(`pct${i}`);
+    // Stagger animation
+    setTimeout(() => {
+      bar.style.width = (v * 100).toFixed(1) + '%';
+      bar.className = 'conf-bar-fill' + (i === max ? ' top' : i === second ? ' second' : '');
+      pct.textContent = (v * 100).toFixed(0) + '%';
+    }, i * 40);
+  });
+}
+
+// ── Navbar & Modal ─────────────────────────────────────────────
+const navTrigger   = document.getElementById('navTrigger');
+const navDropdown  = document.getElementById('navDropdown');
+const modalOverlay = document.getElementById('modalOverlay');
+const modalClose   = document.getElementById('modalClose');
+
+function toggleDropdown(force) {
+  const open = force !== undefined ? force : !navDropdown.classList.contains('open');
+  navDropdown.classList.toggle('open', open);
+  navTrigger.classList.toggle('open', open);
+}
+
+navTrigger.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
+document.addEventListener('click', () => toggleDropdown(false));
+
+document.getElementById('navHome').addEventListener('click', () => {
+  toggleDropdown(false);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+document.getElementById('navAbout').addEventListener('click', () => {
+  toggleDropdown(false);
+  modalOverlay.classList.add('open');
+});
+
+modalClose.addEventListener('click', () => modalOverlay.classList.remove('open'));
+modalOverlay.addEventListener('click', e => {
+  if (e.target === modalOverlay) modalOverlay.classList.remove('open');
+});
+
+// ── Predict ────────────────────────────────────────────────────
+document.getElementById('predictBtn').addEventListener('click', async () => {
+  if (!hasDrawing) {
+    setStatus('draw something first', false, true);
+    setTimeout(() => setStatus('ready', false, false), 2000);
+    return;
+  }
+
+  const btn = document.getElementById('predictBtn');
+  btn.classList.add('loading');
+  btn.textContent = 'Thinking...';
+  setStatus('sending to model', true, false);
+  resetResult();
+  idleMsg.textContent = '...';
+
+  // Export canvas as base64 PNG
+  const imageData = canvas.toDataURL('image/png');
+
+  try {
+    const res = await fetch('http://localhost:5000/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData })
+    });
+
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+
+    // data = { digit: 7, confidences: [0.01, 0.02, ...10 values...] }
+    showResult(data.digit, data.confidences);
+    setStatus(`predicted: ${data.digit}`, false, false);
+
+  } catch (err) {
+    // ── DEMO MODE (no backend) ──────────────────────────────
+    // Remove this block once your Flask backend is running
+    console.warn('Backend not found — running demo mode:', err.message);
+    const fakeDigit = Math.floor(Math.random() * 10);
+    const fakeConf = Array.from({ length: 10 }, (_, i) => {
+      if (i === fakeDigit) return 0.7 + Math.random() * 0.25;
+      return Math.random() * 0.08;
+    });
+    const total = fakeConf.reduce((a, b) => a + b, 0);
+    const norm = fakeConf.map(v => v / total);
+    showResult(fakeDigit, norm);
+    setStatus('demo mode (no backend)', false, true);
+    document.getElementById('backendNote').textContent = '⚠ demo mode — backend offline';
+    // ── END DEMO MODE ───────────────────────────────────────
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = 'Predict →';
+  }
+});
+</script>
+</body>
+</html>
