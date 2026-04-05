@@ -121,7 +121,7 @@ model.compile(
 callbacks = [
     # Save the best model checkpoint automatically
     ModelCheckpoint(
-        "digit_model.h5",
+        "digit_model.keras",
         monitor="val_accuracy",
         save_best_only=True,
         verbose=1,
@@ -139,7 +139,7 @@ callbacks = [
 
 # ── 6. Train ───────────────────────────────────────────────────
 print("\n[4/5] Training...")
-print("      (ModelCheckpoint saves best weights to digit_model.h5)\n")
+print("      (ModelCheckpoint saves best weights to digit_model.keras)\n")
 
 BATCH_SIZE = 128  # Larger batch = faster epochs
 EPOCHS     = 8    # Hits 99%+ in 8 epochs with these settings
@@ -155,13 +155,13 @@ history = model.fit(
 
 # ── 7. Final evaluation ────────────────────────────────────────
 print("\n[5/5] Evaluating best saved model...")
-best_model = keras.models.load_model("digit_model.h5")
+best_model = keras.models.load_model("digit_model.keras")
 test_loss, test_acc = best_model.evaluate(x_test, y_test, verbose=0)
 
 print("\n" + "=" * 55)
 print(f"  Final test accuracy : {test_acc * 100:.3f}%")
 print(f"  Final test loss     : {test_loss:.5f}")
-print(f"  Model saved to      : digit_model.h5")
+print(f"  Model saved to      : digit_model.keras")
 print("=" * 55)
 
 if test_acc >= 0.995:
