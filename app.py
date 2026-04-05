@@ -18,9 +18,13 @@ app = Flask(__name__)
 CORS(app)  # Allow requests from your frontend (index.html)
 
 # ── Load model once at startup ─────────────────────────
-print("\n[startup] Loading model...")
+print("[startup] Loading model...")
 try:
-    model = tf.keras.models.load_model("digit_model.h5")
+    import os
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(BASE_DIR, "digit_model.h5")
+    print(f"[startup] Looking for model at: {model_path}")
+    model = tf.keras.models.load_model(model_path)
     print("[startup] digit_model.h5 loaded successfully.")
     print(f"[startup] Input shape  : {model.input_shape}")
     print(f"[startup] Output shape : {model.output_shape}")
