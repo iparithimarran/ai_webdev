@@ -22,15 +22,15 @@ print("[startup] Loading model...")
 try:
     import os
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(BASE_DIR, "digit_model.h5")
+    model_path = os.path.join(BASE_DIR, "digit_model.keras")
     print(f"[startup] Looking for model at: {model_path}")
     model = tf.keras.models.load_model(model_path)
-    print("[startup] digit_model.h5 loaded successfully.")
+    print("[startup] digit_model.keras loaded successfully.")
     print(f"[startup] Input shape  : {model.input_shape}")
     print(f"[startup] Output shape : {model.output_shape}")
 except Exception as e:
-    print(f"[startup] ERROR: Could not load model.h5 — {e}")
-    print("[startup] Run train_model.py first to generate model.h5")
+    print(f"[startup] ERROR: Could not load model.keras — {e}")
+    print("[startup] Run train_model.py first to generate model.keras")
     model = None
 
 
