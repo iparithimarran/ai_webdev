@@ -955,7 +955,7 @@ document.getElementById('predictBtn').addEventListener('click', async () => {
   const imageData = canvas.toDataURL('image/png');
 
   try {
-    const res = await fetch('https://digit-recognizer.onrender.com/predict', {
+    const res = await fetch('https://iparithimarran-digit-recogniser.hf.space/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: imageData })
