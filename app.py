@@ -1,6 +1,6 @@
 """
 Flask Backend — Digit Recognizer API
-Trains model automatically on first run if no model file is found.
+Uses a lightweight model that trains within Render's 512MB free tier.
 """
 
 import os
@@ -17,33 +17,37 @@ CORS(app)
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "digit_model.keras")
 
-# ── Train model from scratch ───────────────────────────
+# ── Train a lightweight model that fits in 512MB ───────
 def train_and_save():
     import tensorflow as tf
     from tensorflow import keras
     from tensorflow.keras import layers
 
-    print("[train] No model found — training now (~5 mins)...")
+    # Limit TF memory usage
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+
+    print("[train] Loading MNIST...")
     (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
 
-    x_train = x_train.astype("float32") / 255.0
-    x_test  = x_test.astype("float32")  / 255.0
+    # Use only 30k samples to save memory
+    x_train = x_train[:30000].astype("float32") / 255.0
+    y_train = y_train[:30000]
+    x_test  = x_test.astype("float32") / 255.0
+
     x_train = x_train[..., None]
     x_test  = x_test[..., None]
 
+    print("[train] Building model...")
     model = keras.Sequential([
         layers.Input(shape=(28, 28, 1)),
-        layers.Conv2D(32, (3,3), activation="relu", padding="same"),
-        layers.Conv2D(32, (3,3), activation="relu", padding="same"),
+        layers.Conv2D(16, (3,3), activation="relu"),
         layers.MaxPooling2D(),
-        layers.Dropout(0.25),
-        layers.Conv2D(64, (3,3), activation="relu", padding="same"),
-        layers.Conv2D(64, (3,3), activation="relu", padding="same"),
+        layers.Conv2D(32, (3,3), activation="relu"),
         layers.MaxPooling2D(),
-        layers.Dropout(0.25),
         layers.Flatten(),
-        layers.Dense(256, activation="relu"),
-        layers.Dropout(0.5),
+        layers.Dense(64, activation="relu"),
+        layers.Dropout(0.3),
         layers.Dense(10, activation="softmax"),
     ])
 
@@ -53,29 +57,39 @@ def train_and_save():
         metrics=["accuracy"],
     )
 
-    model.fit(x_train, y_train, epochs=5, batch_size=128,
-              validation_data=(x_test, y_test), verbose=1)
+    print("[train] Training (3 epochs)...")
+    model.fit(
+        x_train, y_train,
+        epochs=3,
+        batch_size=256,
+        validation_data=(x_test, y_test),
+        verbose=1,
+    )
 
     _, acc = model.evaluate(x_test, y_test, verbose=0)
     print(f"[train] Done! Accuracy: {acc*100:.2f}%")
     model.save(MODEL_PATH)
-    print(f"[train] Model saved to {MODEL_PATH}")
+    print(f"[train] Saved to {MODEL_PATH}")
     return model
 
-# ── Load or train model ────────────────────────────────
-print("\n[startup] Initializing model...")
+# ── Load or train ──────────────────────────────────────
+print("\n[startup] Initializing...")
 try:
     import tensorflow as tf
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+
     if os.path.exists(MODEL_PATH):
-        print(f"[startup] Loading existing model from {MODEL_PATH}")
+        print(f"[startup] Loading model from {MODEL_PATH}")
         model = tf.keras.models.load_model(MODEL_PATH)
-        print("[startup] Model loaded successfully!")
+        print("[startup] Model loaded!")
     else:
-        print("[startup] No model file found — training from scratch...")
+        print("[startup] No model found — training now...")
         model = train_and_save()
-    print(f"[startup] Ready! Input: {model.input_shape} Output: {model.output_shape}")
+
+    print(f"[startup] Ready! {model.input_shape} → {model.output_shape}")
 except Exception as e:
-    print(f"[startup] FATAL ERROR: {e}")
+    print(f"[startup] ERROR: {e}")
     model = None
 
 # ── Preprocess canvas image ────────────────────────────
@@ -105,10 +119,10 @@ def predict():
         return jsonify({"error": "Missing 'image' field."}), 400
 
     try:
-        tensor      = preprocess(data["image"])
-        preds       = model.predict(tensor, verbose=0)[0].tolist()
-        digit       = int(np.argmax(preds))
-        confidence  = float(max(preds))
+        tensor     = preprocess(data["image"])
+        preds      = model.predict(tensor, verbose=0)[0].tolist()
+        digit      = int(np.argmax(preds))
+        confidence = float(max(preds))
         print(f"[predict] digit={digit}  conf={confidence*100:.1f}%")
         return jsonify({
             "digit":       digit,
