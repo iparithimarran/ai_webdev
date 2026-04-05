@@ -1,6 +1,6 @@
 """
 Flask Backend — Digit Recognizer API
-Uses a lightweight model that trains within Render's 512MB free tier.
+Downloads pre-trained model from Hugging Face on first run.
 """
 
 import os
@@ -17,77 +17,25 @@ CORS(app)
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "digit_model.keras")
 
-# ── Train a lightweight model that fits in 512MB ───────
-def train_and_save():
-    import tensorflow as tf
-    from tensorflow import keras
-    from tensorflow.keras import layers
+# ── PASTE YOUR HUGGING FACE URL HERE ──────────────────
+HF_URL = "https://huggingface.co/iparithimarran/digit-model/resolve/main/digit_model.keras"
 
-    # Limit TF memory usage
-    tf.config.threading.set_intra_op_parallelism_threads(1)
-    tf.config.threading.set_inter_op_parallelism_threads(1)
+# ── Download model from Hugging Face ──────────────────
+def download_model():
+    import urllib.request
+    print(f"[startup] Downloading model from Hugging Face...")
+    urllib.request.urlretrieve(HF_URL, MODEL_PATH)
+    print(f"[startup] Download complete!")
 
-    print("[train] Loading MNIST...")
-    (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
-
-    # Use only 30k samples to save memory
-    x_train = x_train[:30000].astype("float32") / 255.0
-    y_train = y_train[:30000]
-    x_test  = x_test.astype("float32") / 255.0
-
-    x_train = x_train[..., None]
-    x_test  = x_test[..., None]
-
-    print("[train] Building model...")
-    model = keras.Sequential([
-        layers.Input(shape=(28, 28, 1)),
-        layers.Conv2D(16, (3,3), activation="relu"),
-        layers.MaxPooling2D(),
-        layers.Conv2D(32, (3,3), activation="relu"),
-        layers.MaxPooling2D(),
-        layers.Flatten(),
-        layers.Dense(64, activation="relu"),
-        layers.Dropout(0.3),
-        layers.Dense(10, activation="softmax"),
-    ])
-
-    model.compile(
-        optimizer="adam",
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"],
-    )
-
-    print("[train] Training (3 epochs)...")
-    model.fit(
-        x_train, y_train,
-        epochs=3,
-        batch_size=256,
-        validation_data=(x_test, y_test),
-        verbose=1,
-    )
-
-    _, acc = model.evaluate(x_test, y_test, verbose=0)
-    print(f"[train] Done! Accuracy: {acc*100:.2f}%")
-    model.save(MODEL_PATH)
-    print(f"[train] Saved to {MODEL_PATH}")
-    return model
-
-# ── Load or train ──────────────────────────────────────
+# ── Load model ─────────────────────────────────────────
 print("\n[startup] Initializing...")
 try:
     import tensorflow as tf
-    tf.config.threading.set_intra_op_parallelism_threads(1)
-    tf.config.threading.set_inter_op_parallelism_threads(1)
-
-    if os.path.exists(MODEL_PATH):
-        print(f"[startup] Loading model from {MODEL_PATH}")
-        model = tf.keras.models.load_model(MODEL_PATH)
-        print("[startup] Model loaded!")
-    else:
-        print("[startup] No model found — training now...")
-        model = train_and_save()
-
-    print(f"[startup] Ready! {model.input_shape} → {model.output_shape}")
+    if not os.path.exists(MODEL_PATH):
+        download_model()
+    print(f"[startup] Loading model...")
+    model = tf.keras.models.load_model(MODEL_PATH)
+    print(f"[startup] Ready!")
 except Exception as e:
     print(f"[startup] ERROR: {e}")
     model = None
@@ -113,11 +61,9 @@ def health():
 def predict():
     if model is None:
         return jsonify({"error": "Model not loaded."}), 503
-
     data = request.get_json(silent=True)
     if not data or "image" not in data:
         return jsonify({"error": "Missing 'image' field."}), 400
-
     try:
         tensor     = preprocess(data["image"])
         preds      = model.predict(tensor, verbose=0)[0].tolist()
